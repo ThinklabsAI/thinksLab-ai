@@ -1,8 +1,8 @@
-import React, {useState, useEffect} from 'react'
+import React, {useState, useEffect, useCallback} from 'react'
 import { Grid, Segment, Message, Image, Icon, TextArea, Modal, Button } from 'semantic-ui-react'
 
 import "./chatbot.css";
-// import axios from 'axios';
+import axios from 'axios';
 
 import logo from "../assets/logo.png";
 import woman from "../assets/woman.png";
@@ -13,16 +13,24 @@ import TextareaAutosize from 'react-textarea-autosize';
 
 import {returnSet} from "./initial_question_set.js";
 
-import OpenAI from 'openai';
+// import OpenAI from 'openai';
+
+import {db} from "../firebase.js"
+import { collection, updateDoc, arrayUnion, getDoc, addDoc, serverTimestamp, getDocs, doc } from 'firebase/firestore'
 
 
-function Chatbot(email) {
+
+function Chatbot({email}) {
 
   const [question, setQuestion] = useState('');
 
   const [loading, setLoading] = useState(false);
   
   const [storedPromptList, setStoredPromptList] = useState([]);
+
+  const [currentDateTimeString, setCurrentDateTimeString] = useState("");
+
+  const [oddMessagesStatus, setOddMessagesStatus] = useState([]);
 
   const [check, setCheck] = useState(false);
 
@@ -36,12 +44,91 @@ function Chatbot(email) {
 
   const MAXTOKEN = 5000;
 
-  const openaiApiKey = process.env.REACT_APP_OPENAI_API;
+  // const openaiApiKey = process.env.REACT_APP_OPENAI_API;
 
-  const openai = new OpenAI({
-    apiKey: openaiApiKey,
-    dangerouslyAllowBrowser: true
-  });
+  // const openai = new OpenAI({
+  //   apiKey: openaiApiKey,
+  //   dangerouslyAllowBrowser: true
+  // });
+
+
+  const addDataToFirestore = useCallback(async (currentDateTimeString, data) => 
+  {    
+    const combinedPath = 'dataset/' + email + '/'+ currentDateTimeString;
+    const collectionRef = collection(db, combinedPath);
+  
+    let firstDocumentId="";
+
+    const querySnapshot = await getDocs(collectionRef);
+    querySnapshot.forEach((doc) => {
+      firstDocumentId = doc.id;
+
+      return;
+    });
+
+    if (firstDocumentId!=="")
+    { 
+      try 
+      {
+        const docRefchild = doc(db, combinedPath, firstDocumentId);
+
+        const docSnapshot = await getDoc(docRefchild);  
+        
+        const existing = docSnapshot.data();
+
+        const existingData = existing.data;
+        const newData = data;
+
+        const newElements = newData.filter(element => !existingData.includes(element));
+
+        await updateDoc(docRefchild, {
+          data: arrayUnion(...newElements)
+        });
+        
+        
+      } catch (err) {
+        console.error('Error:', err);
+      }
+    }
+    else
+    {
+      try 
+      {
+        await addDoc(collectionRef, {
+          id: currentDateTimeString,
+          data: data,
+          timestamp: serverTimestamp()
+        })
+
+      } catch (err) {
+        console.log(err);
+      }
+
+    }
+
+  }, [email]); 
+
+
+  const addReactInfoToFirestore = useCallback(async (currentDateTimeString, data, react) => 
+  { 
+    const combinedPath = 'reactions/' + email + '/'+ currentDateTimeString;
+    const collectionRef = collection(db, combinedPath);
+
+    try 
+      {
+        await addDoc(collectionRef, {
+          id: currentDateTimeString,
+          data: data,
+          react: react,
+          timestamp: serverTimestamp()
+        })
+
+      } catch (err) {
+        console.log(err);
+      }
+  
+  }, [email]); 
+
 
   function formatTimeRemaining(timeRemainingInMillis, fixedTime) 
   {
@@ -72,10 +159,12 @@ function Chatbot(email) {
   
   }
 
+  
+
   useEffect(() => 
   {
     const storedPromptList = JSON.parse(localStorage.getItem('promptList') || '[]');
-    
+   
     if (storedPromptList.length===0 && check===false)
     { 
       setCheck(true);
@@ -94,12 +183,56 @@ function Chatbot(email) {
     {
       localStorage.setItem('promptList', JSON.stringify(storedPromptList));
       setStoredPromptList(storedPromptList);
+
+      const currentDateTimeString = localStorage.getItem('currentDateTimeString');
+
+      setCurrentDateTimeString(currentDateTimeString);
+
+      const oddmessagesstatus = JSON.parse(localStorage.getItem('oddmessagesstatus') || '[]');
+
+      setOddMessagesStatus(oddmessagesstatus);
+
     }
     
 
-  }, [check]);
+  }, [check, currentDateTimeString]);
 
   
+
+  useEffect(() =>
+  {
+    const storedPromptList = JSON.parse(localStorage.getItem('promptList') || '[]');
+    
+    const fetchData = async () => {
+      if (storedPromptList.length === 1) {
+        const currentDateTime = new Date();
+        const year = currentDateTime.getFullYear();
+        const month = String(currentDateTime.getMonth() + 1).padStart(2, '0');
+        const day = String(currentDateTime.getDate()).padStart(2, '0');
+        const hours = String(currentDateTime.getHours()).padStart(2, '0');
+        const minutes = String(currentDateTime.getMinutes()).padStart(2, '0');
+        const seconds = String(currentDateTime.getSeconds()).padStart(2, '0');
+  
+        const currentDateTimeStr = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+  
+        setCurrentDateTimeString(currentDateTimeStr);
+        localStorage.setItem('currentDateTimeString', currentDateTimeStr);
+  
+      }
+  
+      const existingArrayJSON = localStorage.getItem('oddMessagesStatus');
+      const existingArray = existingArrayJSON ? JSON.parse(existingArrayJSON) : [];
+      setOddMessagesStatus(existingArray);
+
+      localStorage.setItem('oddmessagesstatus', JSON.stringify(existingArray));
+    };
+  
+    fetchData();
+
+  }, [])
+  
+  
+
 
   const handle_input_change = (e) =>
   {
@@ -164,31 +297,72 @@ function Chatbot(email) {
         setStoredPromptList(updatedPromptList);
 
         setLoading(true);
-        const chatCompletion = await openai.chat.completions.create({
-          messages: [{ role: 'user', content: question }],
-          model: 'gpt-3.5-turbo',
-        });
+        // const chatCompletion = await openai.chat.completions.create({
+        //   messages: [{ role: 'user', content: question }],
+        //   model: 'gpt-3.5-turbo',
+        // });
+
+        let selected_option = localStorage.getItem('usertype');
+
+        axios.post('http://127.0.0.1:5000/bot', { email, selected_option }, {
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+          .then(async (response) => {
+            // Handle response from the backend
+            const { chatresponse, wordsCount } = response.data;
+            console.log('aa');
+            
+            setQuestion('');
+
+            let currenttoken = parseInt(wordsCount, 10);
+            let prevtoken = parseInt(tokens, 10);
+            localStorage.setItem('tokens', prevtoken + currenttoken);
+
+            const storedPromptListA = JSON.parse(localStorage.getItem('promptList') || '[]');
+
+            const updatedPromptList1 = [...storedPromptListA, chatresponse];
+            
+            // Store the updated prompt list in localStorage
+            localStorage.setItem('promptList', JSON.stringify(updatedPromptList1));
+
+            setStoredPromptList(updatedPromptList1);
+
+            setCurrentDateTimeString(currentDateTimeString);
+
+            localStorage.setItem('currentDateTimeString', currentDateTimeString);
+
+            setLoading(false);
+
+            setSubmitted(false);
+
+            const existingArrayJSON = localStorage.getItem('oddMessagesStatus');
+
+            const existingArray = existingArrayJSON ? JSON.parse(existingArrayJSON) : [];
+
+            if (existingArray.length===0)
+            {
+              existingArray.push(0);
+            }
+
+            existingArray.push(0);
+
+            localStorage.setItem('oddMessagesStatus', JSON.stringify(existingArray));
+
+            setOddMessagesStatus(existingArray);
+
+            localStorage.setItem('oddmessagesstatus', JSON.stringify(existingArray));
+
+            await addDataToFirestore(currentDateTimeString, updatedPromptList1);
+
+          })
+          .catch(error => {
+            // Handle error
+            console.log(error);
+          });
         
-        // console.log(chatCompletion.choices[0].message.content);
-        setQuestion('');
-
-        let currenttoken = parseInt(chatCompletion.usage.total_tokens, 10);
-        let prevtoken = parseInt(tokens, 10);
-        localStorage.setItem('tokens', prevtoken + currenttoken);
-
-        const storedPromptListA = JSON.parse(localStorage.getItem('promptList') || '[]');
-
-        const updatedPromptList1 = [...storedPromptListA, chatCompletion.choices[0].message.content];
         
-        // Store the updated prompt list in localStorage
-        localStorage.setItem('promptList', JSON.stringify(updatedPromptList1));
-
-        setStoredPromptList(updatedPromptList1);
-
-        setLoading(false);
-
-        setSubmitted(false);
-
       }
     }
     else
@@ -228,6 +402,71 @@ function Chatbot(email) {
 
   }
  
+  const handle_like =async (i) =>
+  {
+    const index = parseInt(i/2, 10);
+
+    const existingArrayJSON = localStorage.getItem('oddMessagesStatus');
+
+    let existingArray = existingArrayJSON ? JSON.parse(existingArrayJSON) : [];
+
+    if(existingArray.length===0)
+    {
+      existingArray=[1]
+      localStorage.setItem('oddMessagesStatus', JSON.stringify(existingArray));
+
+      setOddMessagesStatus(existingArray)
+      localStorage.setItem('oddmessagesstatus', JSON.stringify(existingArray));
+
+      
+    }
+    else
+    {
+      existingArray = [...existingArray];
+
+      existingArray[index] = 1
+  
+      localStorage.setItem('oddMessagesStatus', JSON.stringify(existingArray));
+  
+      setOddMessagesStatus(existingArray);
+      localStorage.setItem('oddmessagesstatus', JSON.stringify(existingArray));
+
+
+      await addReactInfoToFirestore(currentDateTimeString, storedPromptList[parseInt(i, 10)], 1);
+    }
+        
+  }
+
+
+  const handle_dislike =async (i) =>
+  {
+    const index = parseInt(i/2, 10);
+
+    const existingArrayJSON = localStorage.getItem('oddMessagesStatus');
+
+    let existingArray = existingArrayJSON ? JSON.parse(existingArrayJSON) : [];
+
+    if(existingArray.length===0)
+    {
+      existingArray=[-1]
+      localStorage.setItem('oddMessagesStatus', JSON.stringify(existingArray));
+
+    }
+    else
+    {
+      existingArray = [...existingArray];
+      existingArray[index] = -1
+  
+      localStorage.setItem('oddMessagesStatus', JSON.stringify(existingArray));
+
+      setOddMessagesStatus(existingArray);
+      localStorage.setItem('oddmessagesstatus', JSON.stringify(existingArray));
+
+
+      await addReactInfoToFirestore(currentDateTimeString, storedPromptList[parseInt(i, 10)], -1);
+    }
+          
+  }
     
 
   return (
@@ -268,14 +507,13 @@ function Chatbot(email) {
           {storedPromptList.map((message, index) => (
             
           <div key={index} className={index % 2 === 0 ? 'bot-message' : 'user-message'}
-           style={{ textAlign: index % 2 === 0 ? 'left' : 'right'}}>
+           style={{marginLeft: '2%', textAlign: index % 2 === 0 ? 'left' : 'right'}}>
 
           {index % 2 === 0 ? ( // Check if index is even
             <Grid>
-              <Grid.Column width={12}>
-
+              <Grid.Row columns={1}>
                 <Message
-                  className="hoverable-message"
+                  // className="hoverable-message"
                   // color={index % 2 === 0 ? '#cbcbe0' : '#0e38cf'}
                   style={{
                     display: 'inline-block', 
@@ -302,20 +540,30 @@ function Chatbot(email) {
                                 
                 </Message>
 
-              </Grid.Column>
+              </Grid.Row>
 
-              <Grid.Column width={4} verticalAlign='middle' >
-                <Grid >
+              <Grid.Row >
+                <Grid style={{marginLeft: '2%', marginTop:'-30px'}}>
                   <Grid.Column >
-                    <Icon name='thumbs up outline' />
+                    <Icon onClick={() => handle_like(index)} style={{cursor: 'pointer'}}
+                      name={oddMessagesStatus[index/2] === 1
+                        ? 'thumbs up'
+                        : 'thumbs up outline'
+                      }
+                    />
                   </Grid.Column>
 
                   <Grid.Column >
-                    <Icon name='thumbs down outline' />
+                    <Icon onClick={() => handle_dislike(index)} style={{cursor: 'pointer'}}
+                    name={oddMessagesStatus[index/2] === -1
+                      ? 'thumbs down'
+                      : 'thumbs down outline'
+                    }
+                    />
                   </Grid.Column>
                 </Grid>
 
-              </Grid.Column>
+              </Grid.Row>
             </Grid>
           ) : 
           (

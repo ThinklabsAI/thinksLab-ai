@@ -8,10 +8,10 @@ import hackbridge from "../assets/Hackbridge.io_logo.png";
 
 function LandingPartners() {
   return (
-    <div style={{marginTop:'5%', overflow:'hidden', display: 'flex', justifyContent: 'center' }}>
+    <div style={{marginTop:'5%'}}>
         <Grid centered>
                 <Grid.Row>
-                    <p style={{fontFamily: 'Montserrat, sans-serif', fontSize: '18px'}}>Our Partners</p>
+                    <p style={{fontFamily: 'Montserrat, sans-serif', fontSize: '18px'}}>Backed by</p>
                 </Grid.Row>
 
                 <Grid.Row centered>

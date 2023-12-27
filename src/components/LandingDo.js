@@ -5,6 +5,7 @@ import { Grid, Image, Divider } from 'semantic-ui-react'
 import normal_chat from '../assets/normal-chat.png';
 import intent_recognition from '../assets/intent-recognition.png';
 import expense_chat from '../assets/expense-chat.png';
+import "@fontsource/montserrat";
 
 
 function LandingDo() {
@@ -13,12 +14,12 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '2vw',
         fontWeight: 600,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginBottom: '2%', 
         marginTop: '0',
         wordSpacing: '-0.4',
-        letterSpacing: '-0.7',
+        letterSpacing: '-0.5',
         lineHeight: '1.3',
       };
     
@@ -26,9 +27,11 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '1vw',
         fontWeight: 300,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginTop: '1%',
+        letterSpacing: '-0.5',
+        lineHeight: '2.0'
       };
 
 
@@ -36,7 +39,7 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '3vw',
         fontWeight: 600,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginBottom: '2%', 
         marginTop: '0',
@@ -49,7 +52,7 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '2vw',
         fontWeight: 300,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginTop: '1%',
       };
@@ -59,7 +62,7 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '4vw',
         fontWeight: 'normal',
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginBottom: '2%', 
         marginTop: '0',
@@ -72,17 +75,17 @@ function LandingDo() {
         textAlign: 'left',
         fontSize: '3vw',
         fontWeight: 300,
-        fontFamily: "'Montserrat', sans-serif",
+        fontFamily: 'Montserrat',
         color: '#091747',
         marginTop: '1%',
       };
 
   return (
-    <div style={{marginTop: '4%', marginLeft: '7%', marginRight: '7%'}}>
+    <div style={{marginTop: '4%', marginLeft: '6%', marginRight: '6%'}}>
 
         <Grid centered>
             <Grid.Row only='computer'>
-                <p style={{fontFamily: 'Montserrat, sans-serif', fontSize: '52px'}}>What we do</p>
+                <p style={{fontFamily: 'Montserrat', fontSize: '52px'}}>What we do</p>
             </Grid.Row>
         
             <Grid.Row verticalAlign='middle' only='computer'>
